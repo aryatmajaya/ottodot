@@ -4,18 +4,30 @@ A small Laravel application for trial bookings only: choose a child and class, s
 
 ## Run from a fresh clone
 
-Prerequisites: PHP 8.3+, Composer 2, Docker with Compose, and the PHP extensions required by Composer (including DOM/XML, mbstring, PDO MySQL and PDO SQLite). Docker must be running. The application containers use PHP 8.3 and MySQL 8.4.
+Prerequisites: Docker with Compose (Docker Desktop is sufficient), running on Linux, macOS, or Windows via WSL2. No local PHP, Composer, MySQL, or Node.js installation is needed. The application containers use PHP 8.3 and MySQL 8.4.
 
-From the repository root:
+From the repository root, run these commands in Bash (on Windows, use the WSL2 terminal). The first install uses a temporary Composer container because `vendor/bin/sail` and Sail's Docker build files do not exist until dependencies are installed:
 
 ```bash
 cp .env.example .env
-composer install
-composer check-platform-reqs
+
+docker run --rm \
+    --user "$(id -u):$(id -g)" \
+    -e COMPOSER_HOME=/tmp/composer \
+    -v "$PWD:/var/www/html" \
+    -w /var/www/html \
+    laravelsail/php83-composer:latest \
+    composer install --ignore-platform-reqs --no-interaction
+
 ./vendor/bin/sail up -d
-./vendor/bin/sail artisan key:generate
-./vendor/bin/sail artisan migrate --seed
+./vendor/bin/sail composer check-platform-reqs
+./vendor/bin/sail artisan key:generate --no-interaction
+./vendor/bin/sail artisan migrate --seed --no-interaction
 ```
+
+The temporary container installs the versions in `composer.lock`, including Sail. `--ignore-platform-reqs` is used only for this bootstrap container; the next Composer command checks the actual PHP version and extensions inside the application container. Continue only if that check succeeds. The first run downloads Docker images and dependencies and builds the Sail image, so it can take several minutes.
+
+Once Sail is running, use `./vendor/bin/sail composer install` for subsequent dependency installs. Composer runs inside Docker, as described in the [Sail documentation](https://laravel.com/docs/13.x/sail#executing-composer-commands).
 
 Open http://localhost. If port 80 or 3306 is occupied, set `APP_PORT=8080` or `FORWARD_DB_PORT=3307` in `.env` before starting Sail. For port 8080, also set `APP_URL=http://localhost:8080`. Database connections inside Sail still use `DB_HOST=mysql` and port 3306.
 
